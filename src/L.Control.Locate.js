@@ -29,7 +29,7 @@ L.Control.Locate = L.Control.extend({
             //fillColor: '#FFB000'
         },
         metric: true,
-        onLocationError: function(err) {
+        onLocationError: function (err) {
             // this event is called in case of any location error
             // that is not a time out error.
             alert(err.message);
@@ -44,6 +44,7 @@ L.Control.Locate = L.Control.extend({
             popup: "You are within {distance} {unit} from this point",
             outsideMapBoundsMsg: "You seem located outside the boundaries of the map"
         },
+        trackingOnStart: false, // Begin tracking immediately after initialization.
         locateOptions: {}
     },
 
@@ -56,6 +57,7 @@ L.Control.Locate = L.Control.extend({
         this._layer = new L.LayerGroup();
         this._layer.addTo(map);
         this._event = undefined;
+        this._locationFound = false;
 
         this._locateOptions = {
             watch: true  // if you overwrite this, visualization cannot be updated
@@ -78,38 +80,43 @@ L.Control.Locate = L.Control.extend({
         link.href = '#';
         link.title = this.options.strings.title;
 
+        var toggleLocate = function () {
+            if (self._active && (map.getBounds().contains(self._event.latlng) || !self.options.setView ||
+                                 isOutsideMapBounds())) {
+                stopLocate();
+            } else {
+                if (self.options.setView) {
+                    self._locateOnNextLocationFound = true;
+                }
+                if (!self._active) {
+                    map.locate(self._locateOptions);
+                }
+                self._active = true;
+                if (self.options.follow) {
+                    startFollowing();
+                }
+                if (!self._event) {
+                    self._container.className = classNames + " requesting";
+                } else {
+                    visualizeLocation();
+                }
+            }
+        };
+
         L.DomEvent
             .on(link, 'click', L.DomEvent.stopPropagation)
             .on(link, 'click', L.DomEvent.preventDefault)
-            .on(link, 'click', function() {
-                if (self._active && (map.getBounds().contains(self._event.latlng) || !self.options.setView ||
-                    isOutsideMapBounds())) {
-                    stopLocate();
-                } else {
-                    if (self.options.setView) {
-                        self._locateOnNextLocationFound = true;
-                    }
-                    if(!self._active) {
-                        map.locate(self._locateOptions);
-                    }
-                    self._active = true;
-                    if (self.options.follow) {
-                        startFollowing();
-                    }
-                    if (!self._event) {
-                        self._container.className = classNames + " requesting";
-                    } else {
-                        visualizeLocation();
-                    }
-                }
-            })
+            .on(link, 'click', toggleLocate)
             .on(link, 'dblclick', L.DomEvent.stopPropagation);
 
         var onLocationFound = function (e) {
             // no need to do anything if the location has not changed
+            self._active = true;
+            self._locationFound = true;
+
             if (self._event &&
-                (self._event.latlng.lat == e.latlng.lat &&
-                 self._event.latlng.lng == e.latlng.lng)) {
+                (self._event.latlng.lat === e.latlng.lat &&
+                 self._event.latlng.lng === e.latlng.lng)) {
                 return;
             }
 
@@ -122,14 +129,14 @@ L.Control.Locate = L.Control.extend({
             visualizeLocation();
         };
 
-        var startFollowing = function() {
+        var startFollowing = function () {
             self._following = true;
             if (self.options.stopFollowingOnDrag) {
                 map.on('dragstart', stopFollowing);
             }
         };
 
-        var stopFollowing = function() {
+        var stopFollowing = function () {
             self._following = false;
             if (self.options.stopFollowingOnDrag) {
                 map.off('dragstart', stopFollowing);
@@ -144,7 +151,7 @@ L.Control.Locate = L.Control.extend({
                 !map.options.maxBounds.contains(self._event.latlng);
         };
 
-        var visualizeLocation = function() {
+        var visualizeLocation = function () {
             if (self._event.accuracy === undefined)
                 self._event.accuracy = 0;
 
@@ -204,15 +211,16 @@ L.Control.Locate = L.Control.extend({
             }
         };
 
-        var resetVariables = function() {
+        var resetVariables = function () {
             self._active = false;
             self._locateOnNextLocationFound = self.options.setView;
             self._following = false;
+            self._locationFound = false;
         };
 
         resetVariables();
 
-        var stopLocate = function() {
+        var stopLocate = function () {
             map.stopLocate();
             map.off('dragstart', stopFollowing);
 
@@ -222,9 +230,10 @@ L.Control.Locate = L.Control.extend({
             self._layer.clearLayers();
         };
 
+
         var onLocationError = function (err) {
             // ignore time out error if the location is watched
-            if (err.code == 3 && this._locateOptions.watch) {
+            if (err.code === 3 && this._locateOptions.watch && this._locationFound) {
                 return;
             }
 
@@ -235,6 +244,13 @@ L.Control.Locate = L.Control.extend({
         // event hooks
         map.on('locationfound', onLocationFound, self);
         map.on('locationerror', onLocationError, self);
+
+        try {
+            if (self.options.trackingOnStart) {
+                toggleLocate();
+            }
+        } catch (e) {
+        }
 
         return container;
     }
