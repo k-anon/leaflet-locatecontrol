@@ -96,7 +96,7 @@ L.Control.Locate = L.Control.extend({
                     startFollowing();
                 }
                 if (!self._event) {
-                    self._container.className = classNames + " requesting";
+                    container.className = classNames + " requesting";
                 } else {
                     visualizeLocation();
                 }
@@ -116,7 +116,8 @@ L.Control.Locate = L.Control.extend({
 
             if (self._event &&
                 (self._event.latlng.lat === e.latlng.lat &&
-                 self._event.latlng.lng === e.latlng.lng)) {
+                 self._event.latlng.lng === e.latlng.lng &&
+                 self._event.accuracy === e.accuracy)) {
                 return;
             }
 
@@ -152,12 +153,14 @@ L.Control.Locate = L.Control.extend({
         };
 
         var visualizeLocation = function () {
+            var radius;
             if (self._event.accuracy === undefined)
-                self._event.accuracy = 0;
+                radius = 0;
+            else
+                radius = self._event.accuracy / 2;
 
             self._layer.clearLayers();
 
-            var radius = self._event.accuracy / 2;
             if (self._locateOnNextLocationFound) {
                 if (isOutsideMapBounds()) {
                     self.options.onLocationOutsideMapBounds(self);
@@ -202,12 +205,10 @@ L.Control.Locate = L.Control.extend({
                 .bindPopup(L.Util.template(t, {distance: distance, unit: unit}))
                 .addTo(self._layer);
 
-            if (!self._container)
-                return;
             if (self._following) {
-                self._container.className = classNames + " active following";
+                container.className = classNames + " active following";
             } else {
-                self._container.className = classNames + " active";
+                container.className = classNames + " active";
             }
         };
 
@@ -224,7 +225,7 @@ L.Control.Locate = L.Control.extend({
             map.stopLocate();
             map.off('dragstart', stopFollowing);
 
-            self._container.className = classNames;
+            container.className = classNames;
             resetVariables();
 
             self._layer.clearLayers();
@@ -233,7 +234,7 @@ L.Control.Locate = L.Control.extend({
 
         var onLocationError = function (err) {
             // ignore time out error if the location is watched
-            if (err.code === 3 && this._locateOptions.watch && this._locationFound) {
+            if (err.code === 3 && self._locateOptions.watch && self._locationFound) {
                 return;
             }
 
