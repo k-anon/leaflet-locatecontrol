@@ -116,7 +116,8 @@ L.Control.Locate = L.Control.extend({
 
             if (self._event &&
                 (self._event.latlng.lat === e.latlng.lat &&
-                 self._event.latlng.lng === e.latlng.lng)) {
+                 self._event.latlng.lng === e.latlng.lng &&
+                 self._event.accuracy === e.accuracy)) {
                 return;
             }
 
