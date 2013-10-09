@@ -3,7 +3,7 @@ L.Control.Locate = L.Control.extend({
         position: 'topleft',
         drawCircle: true,
         follow: false,  // follow with zoom and pan the user's location
-        stopFollowingOnDrag: false, // if follow is true, stop following when map is dragged
+        stopFollowingOnEvents: null, // stop following when map events from this array are fired (if following)
         // range circle
         circleStyle: {
             color: '#136AEC',
@@ -132,17 +132,35 @@ L.Control.Locate = L.Control.extend({
 
         var startFollowing = function () {
             self._following = true;
-            if (self.options.stopFollowingOnDrag) {
-                map.on('dragstart', stopFollowing);
+            if (self.options.stopFollowingOnEvents) {
+                _followingEventsOn();
             }
+            self._currentStopFollowingOnEvents = self.options.stopFollowingOnEvents;
         };
 
         var stopFollowing = function () {
             self._following = false;
-            if (self.options.stopFollowingOnDrag) {
-                map.off('dragstart', stopFollowing);
+            if (self.options.stopFollowingOnEvents) {
+                _followingEventsOff();
             }
             visualizeLocation();
+        };
+        
+        var _followingEventsOn = function () {
+        	if (self._currentStopFollowingOnEvents) {
+        		if (self._currentStopFollowingOnEvents == self.options.stopFollowingOnEvents) {
+        			return;
+        		}
+        		_followingEventsOff();
+        	}
+        	map.on(self.options.stopFollowingOnEvents.join(' '), stopFollowing);
+        };
+        
+        var _followingEventsOff = function () {
+        	if (self._currentStopFollowingOnEvents) {
+        		map.off(self._currentStopFollowingOnEvents.join(' '), stopFollowing);
+        	}
+        	self._currentStopFollowingOnEvents = null;
         };
 
         var isOutsideMapBounds = function () {
@@ -160,6 +178,12 @@ L.Control.Locate = L.Control.extend({
                 radius = self._event.accuracy / 2;
 
             self._layer.clearLayers();
+            
+            if (self._currentStopFollowingOnEvents &&
+            	    (self._currentStopFollowingOnEvents != self.options.stopFollowingOnEvents)) {
+            	_followingEventsOff();
+            	map.on(self.options.stopFollowingOnEvents.join(' '), startFollowing);
+           	}
 
             if (self._locateOnNextLocationFound) {
                 if (isOutsideMapBounds()) {
@@ -217,6 +241,7 @@ L.Control.Locate = L.Control.extend({
             self._locateOnNextLocationFound = self.options.setView;
             self._following = false;
             self._locationFound = false;
+            self._currentStopFollowingOnEvents = null;
         };
 
         resetVariables();
